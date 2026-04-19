@@ -179,23 +179,134 @@ ggplot() +
 
 #----Homework7----
 #----Question1----
-CO2transformed <- 1/(ghg$co2 + 1000)
+# Transforming CO2
+ghg$co2.trans <- 1/(ghg$co2 + 1000)
 
-ghg$BorealV <- ifelse(ghg$Region == "Boreal", 1, 0)
-ghg$TropicalV <- ifelse(ghg$Region == "Tropical", 1, 0)
+#Using the variables already transformed from Prompt 1 above (log.age, log.DIP, log.precip, BorealV, TropicalV)
+# Full model - environmental drivers of CO2 flux
+mod.co2 <- lm(co2.trans ~ airTemp + log.age + mean.depth +
+                log.DIP + log.precip + BorealV + TropicalV,
+              data = ghg)
+summary(mod.co2)
 
-CO2transformedmodel_test <- lm(CO2transformed ~ airTemp + log.age + mean.depth +
-                     log.DIP + log.precip + BorealV + TropicalV + log.chl + surface.area + volume ,
-                   data = ghg)
-summary(CO2transformedmodel_test)
+# Checking assumptions:
+res.co2 <- rstandard(mod.co2)
+fit.co2 <- fitted.values(mod.co2)
+# Normality
+qqnorm(res.co2, pch = 19)
+qqline(res.co2)
+shapiro.test(res.co2)
+# Residuals
+plot(fit.co2, res.co2, pch = 19)
+abline(h = 0)
+# Multicollinearity
+reg.data.co2 <- data.frame(ghg$airTemp, ghg$log.age, ghg$mean.depth,
+                           ghg$log.DIP, ghg$log.precip)
+chart.Correlation(reg.data.co2, histogram = TRUE, pch = 19)
+# Stepwise 
+co2.step <- ols_step_forward_aic(mod.co2)
+co2.step
+plot(co2.step)
 
-# Keeping the variables that have the highest absolute t-values and the ones that have a fair amount of data points/observations
-CO2transformedmodel_final <- lm(CO2transformed ~ log.age +
-                                 log.DIP + log.precip + TropicalV + surface.area,
-                               data = ghg)
-summary(CO2transformedmodel_final)
+#----Question 2---- 
+#Done in docs 
 
-#Question 2 
+#----Question 3-----
+# Almonds
+almond <- ETdat %>%
+  filter(crop == "Almonds") %>%
+  group_by(date) %>%
+  summarise(ET.in = mean(Ensemble.ET, na.rm=TRUE))
 
+almond_ts <- ts(almond$ET.in, start = c(2016,1), frequency = 12)
+almond_dec <- decompose(almond_ts)
+plot(almond_dec)
+title("Almonds", line = -1) 
 
+# Pistachios
+pistachios <- ETdat %>%
+  filter(crop == "Pistachios") %>%
+  group_by(date) %>%
+  summarise(ET.in = mean(Ensemble.ET, na.rm=TRUE))
+
+pistachios_ts <- ts(pistachios$ET.in, start = c(2016,1), frequency = 12)
+pistachios_dec <- decompose(pistachios_ts)
+plot(pistachios_dec)
+title("Pistachios", line = -1) 
+
+# Fallow/Idle fields 
+fallow <- ETdat %>%
+  filter(crop == "Fallow/Idle Cropland") %>%
+  group_by(date) %>%
+  summarise(ET.in = mean(Ensemble.ET, na.rm=TRUE))
+
+fallow_ts <- ts(fallow$ET.in, start = c(2016,1), frequency = 12)
+fallow_dec <- decompose(fallow_ts)
+plot(fallow_dec)
+title("Fallow/Idle Fields", line = -1) 
+
+# Corn
+corn <- ETdat %>%
+  filter(crop == "Corn") %>%
+  group_by(date) %>%
+  summarise(ET.in = mean(Ensemble.ET, na.rm=TRUE))
+
+corn_ts <- ts(corn$ET.in, start = c(2016,1), frequency = 12)
+corn_dec <- decompose(corn_ts)
+plot(corn_dec)
+title("Corn", line = -1) 
+
+# Table Grapes
+grapes <- ETdat %>%
+  filter(crop == "Grapes (Table/Raisin)") %>%
+  group_by(date) %>%
+  summarise(ET.in = mean(Ensemble.ET, na.rm=TRUE))
+
+grapes_ts <- ts(grapes$ET.in, start = c(2016,1), frequency = 12)
+grapes_dec <- decompose(grapes_ts)
+plot(grapes_dec)
+title("Table Grapes", line = -1) 
+
+#----Question 4----
+#----Question4----
+# Pistachios AR model
+pistachios_y <- na.omit(pistachios_ts)
+pistachios_ar <- arima(pistachios_y, order = c(4,0,0))
+pistachios_ar
+
+newPistachios <- forecast(pistachios_ar)
+newPistachiosF <- data.frame(newPistachios)
+
+years <- c(rep(2021,4),rep(2022,12), rep(2023,8))
+month <- c(seq(9,12),seq(1,12), seq(1,8))
+newPistachiosF$dateF <- ymd(paste(years,"/",month,"/",1))
+
+ggplot() +
+  geom_line(data = pistachios, aes(x = ymd(date), y = ET.in))+
+  xlim(ymd(pistachios$date[1]),newPistachiosF$dateF[24])+
+  geom_line(data = newPistachiosF, aes(x = dateF, y = Point.Forecast), col="red") +
+  geom_ribbon(data=newPistachiosF, 
+              aes(x=dateF,ymin=Lo.95, ymax=Hi.95), fill=rgb(0.5,0.5,0.5,0.5))+
+  theme_classic()+
+  labs(x="year", y="Evapotranspiration (in)", title="Pistachios Forecast")
+
+# Fallow AR model
+fallow_y <- na.omit(fallow_ts)
+fallow_ar <- arima(fallow_y, order = c(4,0,0))
+fallow_ar
+
+newFallow <- forecast(fallow_ar)
+newFallowF <- data.frame(newFallow)
+newFallowF$dateF <- ymd(paste(years,"/",month,"/",1))
+
+ggplot() +
+  geom_line(data = fallow, aes(x = ymd(date), y = ET.in))+
+  xlim(ymd(fallow$date[1]),newFallowF$dateF[24])+
+  geom_line(data = newFallowF, aes(x = dateF, y = Point.Forecast), col="red") +
+  geom_ribbon(data=newFallowF, 
+              aes(x=dateF,ymin=Lo.95, ymax=Hi.95), fill=rgb(0.5,0.5,0.5,0.5))+
+  theme_classic()+
+  labs(x="year", y="Evapotranspiration (in)", title="Fallow/Idle Forecast")
+#----Question 5----
+#Done on doc
 
