@@ -189,6 +189,9 @@ mod.co2 <- lm(co2.trans ~ airTemp + log.age + mean.depth +
               data = ghg)
 summary(mod.co2)
 
+co2_table <- summary(mod.co2)$coefficients #Had to look up how to get into a nice table/csv to put into word
+write.csv(co2_table, "/cloud/project/co2_regression_table.csv")
+
 # Checking assumptions:
 res.co2 <- rstandard(mod.co2)
 fit.co2 <- fitted.values(mod.co2)
